@@ -2,66 +2,76 @@ from flask import Flask, request, redirect, url_for, Response, make_response, js
 import cv2
 import numpy as np
 import base64
-from INIT import SERVER_FOLDER
+from config import SERVER_FOLDER
 
 app = Flask(__name__)
 
 @app.route('/', methods=['POST'])
 def upload_file():
-    f = request.data
-    image = cv2.imread(f.decode("utf-8"))
-    cv2.imwrite(SERVER_FOLDER + "img.jpg", image) 
-    return redirect(url_for('crop_file'))
-
-@app.route('/crop')
-def crop_file():
-    image = cv2.imread(SERVER_FOLDER + "img.jpg")
-    height = image.shape[0]
-    width = image.shape[1]
-    center = [int(height/2), int(width/2)]
-    impart1 = image[0:center[0], 0:center[1]]
-    impart2 = image[0:center[0], center[1]:width]
-    impart3 = image[center[0]:height, 0:center[1]]
-    impart4 = image[center[0]:height, center[1]:width]
-
-    cv2.imwrite(SERVER_FOLDER + "1.jpg", impart1)
-    cv2.imwrite(SERVER_FOLDER + "2.jpg", impart2)
-    cv2.imwrite(SERVER_FOLDER + "3.jpg", impart3)
-    cv2.imwrite(SERVER_FOLDER + "4.jpg", impart4)
-    return  Response(status=200)
-
-@app.route('/save_parts', methods=['GET'])
-def save_parts():
-    data = {}
-    for i in range(1,5):
-        with open(SERVER_FOLDER + str(i)+'.jpg','rb') as fil:
-            byte = fil.read()
-        encoded = base64.encodebytes(byte) 
-        data[str(i)] = encoded.decode('ascii') 
-    rr =  json.dumps(data)
-    return make_response(rr) 
+    f = request.json
+    image = cv2.imread(f["path_file"])
+    parts_number = f["parts_number"]
+    crop_result = crop_file(image, parts_number)
+    parts = crop_result["parts"]
+    responce_data={}
+    for i in range(parts_number):
+        responce_data[str(i)] = base64.b64encode(cv2.imencode('.jpg', parts[i])[1]).decode() 
+    responce_data["ratio_y"] = crop_result["ratio_y"]
+    responce_data["ratio_x"] = crop_result["ratio_x"]
+    return make_response(json.dumps(responce_data)) 
+    
+def crop_file(image, number_parts):
+    height, width = image.shape[0], image.shape[1]
+    imparts = []
+    ratio = [1, 2, 3, 5, 7, 11]
+    for i in ratio:
+        if number_parts%i==0:
+            ratio_x = i
+    ratio_y = int(number_parts/ratio_x)
+    if (height>width and ratio_x>ratio_y):
+        ratio_x, ratio_y = ratio_y, ratio_x
+        
+    x_offset, y_offset = int(width/ratio_x), int(height/ratio_y)
+    y1, y2, = 0, y_offset
+    x1, x2 = 0, x_offset
+    for i in range(1,ratio_y+1):
+        for j in range(1,ratio_x+1): 
+            imparts.append(image[y1:y2,x1:x2])
+            x1 = x1 + x_offset
+            x2 = x2 + x_offset
+            if (j==ratio_x):
+                x2 =  width
+        y1 = y1 + y_offset
+        y2 = y2 + y_offset
+        if(i==ratio_y):
+            y2 = height
+        x1, x2 = 0, x_offset
+    return {"parts":imparts, "ratio_y":ratio_y, "ratio_x":ratio_x}
 
 @app.route('/concatenate', methods=['POST'])
 def concatenate_parts():
     f = request.json
-    impart1 = cv2.imread(f["1"])
-    impart2 = cv2.imread(f["2"])
-    impart3 = cv2.imread(f["3"])
-    impart4 = cv2.imread(f["4"])
-    
-    top = np.concatenate((impart1, impart2), axis=1)
-    bottom = np.concatenate((impart3, impart4), axis=1)
-    all = cv2.bitwise_not(np.concatenate((top, bottom), axis=0))
+    ratio_x=f["ratio_x"]
+    ratio_y=f["ratio_y"]
+    impart=[]
+    for i in range(ratio_x*ratio_y):
+        pict = base64.b64decode(f[str(i)])
+        impart.append(cv2.imdecode(np.frombuffer(pict, dtype=np.uint8), flags=1))
+    axis_X = []
+    all_picture=np.array([])
+    for i in range(ratio_y):
+        first = impart.pop()
+        for j in range(ratio_x-1):
+            top = np.concatenate((impart.pop(), first), axis=1)
+        if (i>0):
+            all_picture = np.concatenate((top, all_picture), axis=0)
+        else:
+            all_picture = top
 
-    cv2.imwrite(SERVER_FOLDER + "res.jpg", all)
-    return  Response(status=200)
-
-@app.route('/result', methods=['GET'])
-def get_result():
-    with open(SERVER_FOLDER + 'res.jpg','rb') as fil:
-        byte = fil.read()
-    return make_response(byte)
-
+    all_picture = cv2.bitwise_not(all_picture)
+    responce_data={}
+    responce_data["result"] = base64.b64encode(cv2.imencode('.jpg', all_picture)[1]).decode() 
+    return make_response(json.dumps(responce_data))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
