@@ -2,6 +2,7 @@ from flask import Flask, request, redirect, url_for, Response, make_response, js
 import cv2
 import numpy as np
 import base64
+import os 
 from config import SERVER_FOLDER
 
 app = Flask(__name__)
@@ -9,6 +10,8 @@ app = Flask(__name__)
 @app.route('/', methods=['POST'])
 def upload_file():
     f = request.json
+    if (not(os.path.exists(f["path_file"]))):
+        return Response(status=404)
     image = cv2.imread(f["path_file"])
     parts_number = f["parts_number"]
     crop_result = crop_file(image, parts_number)
