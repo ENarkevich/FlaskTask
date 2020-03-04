@@ -6,7 +6,7 @@ import json
 from config import CLIENT_FOLDER, SERV
 
 if __name__ == "__main__":
-    parts_number = 6
+    parts_number = 10000
     request_data = {}
     #request fot cropp
     request_data["parts_number"] = parts_number

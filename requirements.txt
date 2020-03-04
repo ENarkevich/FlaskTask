@@ -8,9 +8,8 @@ itsdangerous==1.1.0
 Jinja2==2.11.1
 MarkupSafe==1.1.1
 numpy==1.18.1
-#numpy==1.9.0
-opencv-python==3.4.3.18
-#opencv-python==4.2.0.32
+#opencv-python==3.4.3.18
+opencv-python==3.4.8.29
 post==2019.4.13
 public==2019.4.13
 query-string==2019.4.13
