@@ -10,7 +10,7 @@ if __name__ == "__main__":
     request_data = {}
     #request fot cropp
     request_data["parts_number"] = parts_number
-    request_data["path_file"] = f'{CLIENT_FOLDER}picttt.jpg'
+    request_data["path_file"] = f'{CLIENT_FOLDER}pict.jpg'
     responce_parts = requests.post(SERV, json=request_data)  
     if (responce_parts.status_code==200):
         parts = responce_parts.json()
